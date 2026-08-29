@@ -140,6 +140,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{cik}/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Company Prices */
+        get: operations["company_prices_api_v1_companies__cik__prices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{cik}/price-analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Company Price Analysis */
+        get: operations["company_price_analysis_api_v1_companies__cik__price_analysis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/compare": {
         parameters: {
             query?: never;
@@ -201,6 +235,7 @@ export interface components {
             last_synced_at: string | null;
             /** Coverage Reason */
             coverage_reason?: string | null;
+            price_coverage?: components["schemas"]["PriceCoverageOut"] | null;
         };
         /** CompanySummary */
         CompanySummary: {
@@ -278,10 +313,46 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** FilingReactionOut */
+        FilingReactionOut: {
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Form */
+            form: string;
+            /** Accession */
+            accession: string;
+            /** Url */
+            url: string | null;
+            /** Return 1D */
+            return_1d?: string | null;
+            /** Return 5D */
+            return_5d?: string | null;
+            /** Return 20D */
+            return_20d?: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** LatestPriceOut */
+        LatestPriceOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Close */
+            close: string;
+            /** Adj Close */
+            adj_close: string;
+            /** Volume */
+            volume: string;
+            /** Change 1D */
+            change_1d?: string | null;
         };
         /** MetricPointOut */
         MetricPointOut: {
@@ -333,6 +404,212 @@ export interface components {
             /** Unavailable */
             unavailable?: string[];
         };
+        /** PriceAnalysisOut */
+        PriceAnalysisOut: {
+            company: components["schemas"]["CompanySummary"];
+            /** Ticker */
+            ticker: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            latest: components["schemas"]["LatestPriceOut"];
+            /** Returns */
+            returns: {
+                [key: string]: string | null;
+            };
+            /** Risk */
+            risk: {
+                [key: string]: string | null;
+            };
+            /** Technical */
+            technical: {
+                [key: string]: string | null;
+            };
+            /** Rankings */
+            rankings: components["schemas"]["PriceRankOut"][];
+            /** Filing Reactions */
+            filing_reactions: components["schemas"]["FilingReactionOut"][];
+        };
+        /** PriceCoverageOut */
+        PriceCoverageOut: {
+            /** Ticker */
+            ticker: string | null;
+            /** Status */
+            status: string;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /** Last Synced At */
+            last_synced_at: string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** PriceEventOut */
+        PriceEventOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "dividend" | "split" | "filing";
+            /** Label */
+            label: string;
+            /** Value */
+            value?: string | null;
+            /** Accession */
+            accession?: string | null;
+            /** Url */
+            url?: string | null;
+        };
+        /** PriceIndicatorOut */
+        PriceIndicatorOut: {
+            /** Daily Return */
+            daily_return?: string | null;
+            /** Log Return */
+            log_return?: string | null;
+            /** Sma 20 */
+            sma_20?: string | null;
+            /** Sma 50 */
+            sma_50?: string | null;
+            /** Sma 200 */
+            sma_200?: string | null;
+            /** Ema 12 */
+            ema_12?: string | null;
+            /** Ema 26 */
+            ema_26?: string | null;
+            /** Rsi 14 */
+            rsi_14?: string | null;
+            /** Macd */
+            macd?: string | null;
+            /** Macd Signal */
+            macd_signal?: string | null;
+            /** Macd Histogram */
+            macd_histogram?: string | null;
+            /** Bollinger Mid */
+            bollinger_mid?: string | null;
+            /** Bollinger Upper */
+            bollinger_upper?: string | null;
+            /** Bollinger Lower */
+            bollinger_lower?: string | null;
+            /** Drawdown */
+            drawdown?: string | null;
+            /** Volume Average 20 */
+            volume_average_20?: string | null;
+            /** Volume Ratio 20 */
+            volume_ratio_20?: string | null;
+        };
+        /** PricePointOut */
+        PricePointOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Open */
+            open: string;
+            /** High */
+            high: string;
+            /** Low */
+            low: string;
+            /** Close */
+            close: string;
+            /** Volume */
+            volume: string;
+            /** Adj Open */
+            adj_open: string;
+            /** Adj High */
+            adj_high: string;
+            /** Adj Low */
+            adj_low: string;
+            /** Adj Close */
+            adj_close: string;
+            /** Adj Volume */
+            adj_volume: string;
+            /** Dividend Cash */
+            dividend_cash: string;
+            /** Split Factor */
+            split_factor: string;
+            indicators: components["schemas"]["PriceIndicatorOut"];
+        };
+        /** PriceRankOut */
+        PriceRankOut: {
+            /** Metric */
+            metric: string;
+            /** Value */
+            value: string;
+            /** Rank */
+            rank: number;
+            /** Percentile */
+            percentile: string;
+            /** Universe Size */
+            universe_size: number;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Neighbors */
+            neighbors?: components["schemas"]["PriceRankPeerOut"][];
+        };
+        /** PriceRankPeerOut */
+        PriceRankPeerOut: {
+            /** Ticker */
+            ticker: string;
+            /** Company Name */
+            company_name: string;
+            /** Rank */
+            rank: number;
+            /** Value */
+            value: string;
+        };
+        /** PriceSeriesOut */
+        PriceSeriesOut: {
+            company: components["schemas"]["CompanySummary"];
+            /** Ticker */
+            ticker: string;
+            /** Currency */
+            currency: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Points */
+            points: components["schemas"]["PricePointOut"][];
+            /** Events */
+            events: components["schemas"]["PriceEventOut"][];
+        };
+        /** PriceSyncItemOut */
+        PriceSyncItemOut: {
+            /** Ticker */
+            ticker: string;
+            /** Status */
+            status: string;
+            /** Requested From */
+            requested_from: string | null;
+            /** Requested To */
+            requested_to: string | null;
+            /** Row Count */
+            row_count: number;
+            /** Error */
+            error: string | null;
+            /** Started At */
+            started_at: string | null;
+            /** Completed At */
+            completed_at: string | null;
+        };
         /** SecurityOut */
         SecurityOut: {
             /** Ticker */
@@ -362,6 +639,19 @@ export interface components {
             /** Supported Company Count */
             supported_company_count: number;
             latest_sync: components["schemas"]["SyncRunOut"] | null;
+            /**
+             * Tiingo Configured
+             * @default false
+             */
+            tiingo_configured: boolean;
+            /**
+             * Price Company Count
+             * @default 0
+             */
+            price_company_count: number;
+            /** Latest Price Date */
+            latest_price_date?: string | null;
+            latest_price_sync?: components["schemas"]["SyncRunOut"] | null;
         };
         /** SourceOut */
         SourceOut: {
@@ -396,7 +686,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "bulk" | "top100" | "company";
+            kind: "bulk" | "top100" | "company" | "prices" | "price_company";
             /** Cik */
             cik?: string | null;
         };
@@ -429,6 +719,8 @@ export interface components {
             started_at: string | null;
             /** Completed At */
             completed_at: string | null;
+            /** Price Items */
+            price_items?: components["schemas"]["PriceSyncItemOut"][];
         };
         /** ValidationError */
         ValidationError: {
@@ -688,6 +980,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetricPointOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_prices_api_v1_companies__cik__prices_get: {
+        parameters: {
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+            };
+            header?: never;
+            path: {
+                cik: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceSeriesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_price_analysis_api_v1_companies__cik__price_analysis_get: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                cik: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceAnalysisOut"];
                 };
             };
             /** @description Validation Error */

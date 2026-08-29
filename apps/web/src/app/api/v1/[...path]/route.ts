@@ -39,8 +39,22 @@ type RouteContext = { params: Promise<{ path: string[] }> };
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function error(detail: string, status: number) {
+function error(detail: string | Record<string, string>, status: number) {
   return NextResponse.json({ detail }, { status });
+}
+
+function lockedCompany(company: Company): Company {
+  return {
+    ...company,
+    price_coverage: {
+      ticker: company.tickers[0]?.ticker ?? null,
+      status: "locked",
+      start_date: null,
+      end_date: null,
+      last_synced_at: null,
+      reason: "Tiingo 授權限定內部／本機環境使用",
+    },
+  };
 }
 
 function normalizeCik(value: string): string | null {
@@ -113,6 +127,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       company_count: index.companies.length,
       supported_company_count: index.companies.filter((item) => item.supported).length,
       latest_sync: latestSync,
+      tiingo_configured: false,
+      price_company_count: 0,
+      latest_price_date: null,
+      latest_price_sync: null,
     });
   }
 
@@ -148,7 +166,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   if (path.length === 2 && path[0] === "companies") {
     const snapshot = await companySnapshot(request, path[1]);
-    return snapshot ? NextResponse.json(snapshot.company) : error("找不到公司", 404);
+    return snapshot
+      ? NextResponse.json(lockedCompany(snapshot.company))
+      : error("找不到公司", 404);
+  }
+
+  if (
+    path.length === 3 &&
+    path[0] === "companies" &&
+    (path[2] === "prices" || path[2] === "price-analysis")
+  ) {
+    return error(
+      {
+        code: "tiingo_internal_only",
+        message: "Tiingo 股價資料僅限內部／本機環境使用",
+      },
+      403,
+    );
   }
 
   if (path.length === 3 && path[0] === "companies" && path[2] === "metrics") {

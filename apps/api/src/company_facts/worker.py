@@ -12,6 +12,7 @@ from .config import get_settings
 from .db import SessionLocal
 from .ingestion import run_bulk_sync, run_company_sync, run_top100_sync
 from .models import SyncRun
+from .price_sync import run_price_sync
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -49,6 +50,50 @@ def enqueue_scheduled_bulk() -> None:
                 status="pending",
                 progress_current=0,
                 message="每日排程同步",
+            )
+        )
+        session.commit()
+
+
+def enqueue_scheduled_prices() -> None:
+    settings = get_settings()
+    if not settings.tiingo_is_configured:
+        return
+    now_et = datetime.now(ZoneInfo("America/New_York"))
+    if now_et.weekday() == 5 or (now_et.hour, now_et.minute) < (20, 30):
+        return
+    with SessionLocal() as session:
+        active = session.scalar(
+            select(SyncRun.id).where(
+                SyncRun.kind.in_(("prices", "price_company")),
+                SyncRun.status.in_(("pending", "running")),
+            )
+        )
+        if active:
+            return
+        latest = session.scalar(
+            select(SyncRun)
+            .where(
+                SyncRun.kind == "prices",
+                SyncRun.status.in_(("completed", "completed_with_errors")),
+            )
+            .order_by(SyncRun.completed_at.desc())
+            .limit(1)
+        )
+        if (
+            latest is not None
+            and latest.completed_at is not None
+            and latest.completed_at.astimezone(ZoneInfo("America/New_York")).date()
+            >= now_et.date()
+        ):
+            return
+        session.add(
+            SyncRun(
+                id=str(uuid.uuid4()),
+                kind="prices",
+                status="pending",
+                progress_current=0,
+                message="排程 Tiingo Daily EOD 更新",
             )
         )
         session.commit()
@@ -95,6 +140,10 @@ def process_once() -> bool:
             run_top100_sync(run_id)
         elif kind == "company" and cik:
             run_company_sync(run_id, cik)
+        elif kind == "prices":
+            run_price_sync(run_id)
+        elif kind == "price_company" and cik:
+            run_price_sync(run_id, cik=cik)
         else:
             raise ValueError(f"Unsupported sync job: kind={kind!r}, cik={cik!r}")
     except Exception as exc:
@@ -108,6 +157,7 @@ def main() -> None:
     logger.info("Company Facts worker started")
     while True:
         enqueue_scheduled_bulk()
+        enqueue_scheduled_prices()
         if not process_once():
             time.sleep(settings.sync_poll_seconds)
 

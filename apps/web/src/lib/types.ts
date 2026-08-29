@@ -36,3 +36,12 @@ export type CompareData = Omit<Schemas["CompareOut"], "companies" | "series"> & 
   companies: Company[];
   series: Record<string, Record<string, MetricPoint[]>>;
 };
+export type PriceCoverage = Schemas["PriceCoverageOut"];
+export type PricePoint = Schemas["PricePointOut"];
+export type PriceEvent = Schemas["PriceEventOut"];
+export type PriceSeries = Omit<Schemas["PriceSeriesOut"], "company"> & {
+  company: Company;
+};
+export type PriceAnalysis = Omit<Schemas["PriceAnalysisOut"], "company"> & {
+  company: Company;
+};

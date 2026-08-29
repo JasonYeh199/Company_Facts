@@ -1,13 +1,39 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, DatabaseZap, HardDrive, LoaderCircle, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  DatabaseZap,
+  HardDrive,
+  LineChart,
+  LoaderCircle,
+  RefreshCw,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
 import type { SetupStatus, SyncRun } from "@/lib/types";
 
 function statusName(status: string) {
-  return { pending: "等待中", running: "執行中", completed: "完成", failed: "失敗", cancelled: "已取消" }[status] ?? status;
+  return (
+    {
+      pending: "等待中",
+      running: "執行中",
+      completed: "已完成",
+      completed_with_errors: "部分完成",
+      failed: "失敗",
+      unsupported: "供應商不支援",
+      cancelled: "已取消",
+    }[status] ?? status
+  );
+}
+
+function runName(run: SyncRun) {
+  if (run.kind === "bulk") return "全市場基本面";
+  if (run.kind === "top100") return "市值前 100 基本面";
+  if (run.kind === "prices") return "Top 100 Tiingo EOD";
+  if (run.kind === "price_company") return `股價 CIK ${run.cik}`;
+  return `基本面 CIK ${run.cik}`;
 }
 
 export function SyncPanel({ initial }: { initial: SetupStatus | null }) {
@@ -22,60 +48,136 @@ export function SyncPanel({ initial }: { initial: SetupStatus | null }) {
         setStatus(next);
         setRuns(nextRuns);
       } catch {
-        setMessage("API 暫時無法連線");
+        setMessage("無法連線至 API。請確認 FastAPI 與 PostgreSQL 已啟動。");
       }
     };
     const timer = window.setInterval(refresh, 5000);
     return () => window.clearInterval(timer);
   }, []);
 
-  const bootstrap = async (kind: "bulk" | "top100") => {
-    setMessage(kind === "top100" ? "建立市值前 100 同步工作…" : "建立全量同步工作…");
+  const startSync = async (kind: "bulk" | "top100" | "prices") => {
+    setMessage("正在建立同步工作…");
     try {
       await api.createSync(kind);
       setRuns(await api.syncRuns());
-      setMessage("已加入佇列；可離開此頁，worker 會繼續處理。首次匯入可能需要較長時間。 ");
+      setMessage(
+        kind === "prices"
+          ? "Tiingo 工作已排入佇列；Starter 方案同步 100 檔約需 2–3 小時。"
+          : "SEC 工作已排入佇列，可留在此頁查看進度。",
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "無法建立同步工作");
     }
   };
 
   if (!status) {
-    return <div className="empty-page"><AlertTriangle /><h1>API 尚未連線</h1><p>請確認 FastAPI 與 PostgreSQL 已啟動。</p></div>;
+    return (
+      <div className="empty-page">
+        <AlertTriangle />
+        <h1>API 尚未連線</h1>
+        <p>請確認 FastAPI 與 PostgreSQL 已啟動。</p>
+      </div>
+    );
   }
+
   const readOnlySnapshot = status.data_dir === "vercel://read-only-snapshot";
+  const active = runs.some((run) => ["pending", "running"].includes(run.status));
   return (
     <div className="setup-page">
-      <header className="page-intro"><span className="section-kicker">DATA OPERATIONS</span><h1>資料環境與同步</h1><p>第一次匯入會下載 SEC bulk archives，並逐家公司建立 raw facts 與 canonical metrics。</p></header>
-      <section className="readiness-grid">
+      <header className="page-intro">
+        <span className="section-kicker">DATA OPERATIONS</span>
+        <h1>資料設定與同步</h1>
+        <p>管理 SEC Company Facts 與內部限定的 Tiingo Daily EOD 股價資料。</p>
+      </header>
+
+      <section className="readiness-grid price-readiness-grid">
         <article className={status.sec_configured ? "ready" : "warning"}>
-          {status.sec_configured ? <CheckCircle2 /> : <AlertTriangle />}<div><small>{readOnlySnapshot ? "DEPLOYMENT MODE" : "SEC USER-AGENT"}</small><strong>{readOnlySnapshot ? "唯讀快照" : status.sec_configured ? "已設定" : "需要設定"}</strong><span>{readOnlySnapshot ? "線上版不執行寫入或同步" : status.sec_configured ? "符合自動化存取要求" : "請編輯根目錄 .env"}</span></div>
+          {status.sec_configured ? <CheckCircle2 /> : <AlertTriangle />}
+          <div>
+            <small>{readOnlySnapshot ? "DEPLOYMENT MODE" : "SEC USER-AGENT"}</small>
+            <strong>{readOnlySnapshot ? "唯讀 Snapshot" : status.sec_configured ? "已設定" : "尚未設定"}</strong>
+            <span>{readOnlySnapshot ? "公開站不執行同步" : "SEC EDGAR 存取識別"}</span>
+          </div>
+        </article>
+        <article className={readOnlySnapshot || status.tiingo_configured ? "ready" : "warning"}>
+          {readOnlySnapshot || status.tiingo_configured ? <CheckCircle2 /> : <AlertTriangle />}
+          <div>
+            <small>TIINGO TOKEN</small>
+            <strong>{readOnlySnapshot ? "內部限定" : status.tiingo_configured ? "已設定" : "尚未設定"}</strong>
+            <span>{readOnlySnapshot ? "不輸出價格資料" : `${status.price_company_count} 家已有價格`}</span>
+          </div>
         </article>
         <article className={status.free_gib >= status.disk_requirement_gib ? "ready" : "warning"}>
-          <HardDrive /><div><small>{readOnlySnapshot ? "資料涵蓋" : "可用磁碟"}</small><strong>{readOnlySnapshot ? "近年資料" : `${status.free_gib} GiB`}</strong><span>{readOnlySnapshot ? "Annual 2019+ · Quarterly/TTM 2023+" : `最低需求 ${status.disk_requirement_gib} GiB`}</span></div>
+          <HardDrive />
+          <div>
+            <small>儲存空間</small>
+            <strong>{readOnlySnapshot ? "靜態資料" : `${status.free_gib} GiB`}</strong>
+            <span>{readOnlySnapshot ? "Vercel read-only" : `建議至少 ${status.disk_requirement_gib} GiB`}</span>
+          </div>
         </article>
         <article className="ready">
-          <DatabaseZap /><div><small>資料庫</small><strong>{status.supported_company_count.toLocaleString("zh-TW")} 家</strong><span>{status.company_count.toLocaleString("zh-TW")} 家證券主檔</span></div>
+          <DatabaseZap />
+          <div>
+            <small>公司覆蓋</small>
+            <strong>{status.supported_company_count.toLocaleString("zh-TW")} 家</strong>
+            <span>最新價格 {status.latest_price_date ?? "尚未匯入"}</span>
+          </div>
         </article>
       </section>
+
       <section className="panel bootstrap-panel">
-        <div><span className="section-kicker">{readOnlySnapshot ? "VERCEL SNAPSHOT" : "FOCUSED BOOTSTRAP"}</span><h2>{readOnlySnapshot ? "線上唯讀資料" : "SEC Bulk Bootstrap"}</h2><p>{readOnlySnapshot ? "搜尋、個股分析、比較與來源追溯可直接使用；資料更新請回到本機 worker 執行後重新匯出。" : "建議先同步市值前 100；系統會重用 SEC ZIP，成功後每日美東 04:00 自動檢查更新。"}</p></div>
+        <div>
+          <span className="section-kicker">FUNDAMENTALS</span>
+          <h2>SEC Company Facts</h2>
+          <p>更新市值前 100 家或完整 US-GAAP 公司資料。</p>
+        </div>
         {!readOnlySnapshot ? (
           <div className="sync-actions">
-            <button className="button primary" disabled={!status.sec_configured || status.free_gib < 60 || runs.some((run) => ["pending", "running"].includes(run.status))} onClick={() => bootstrap("top100")}><RefreshCw size={17} />同步市值前 100</button>
-            <button className="button secondary" disabled={!status.sec_configured || status.free_gib < 60 || runs.some((run) => ["pending", "running"].includes(run.status))} onClick={() => bootstrap("bulk")}><DatabaseZap size={17} />同步全市場</button>
+            <button className="button primary" disabled={!status.sec_configured || status.free_gib < 60 || active} onClick={() => startSync("top100")}>
+              <RefreshCw size={17} />同步前 100
+            </button>
+            <button className="button secondary" disabled={!status.sec_configured || status.free_gib < 60 || active} onClick={() => startSync("bulk")}>
+              <DatabaseZap size={17} />完整同步
+            </button>
           </div>
         ) : null}
       </section>
+
+      <section className="panel bootstrap-panel price-bootstrap-panel">
+        <div>
+          <span className="section-kicker">DAILY EOD · INTERNAL USE</span>
+          <h2>Tiingo 股價資料</h2>
+          <p>首次抓取最近十年；日常增量同步並重算技術指標、風險與 Top 100 排名。</p>
+        </div>
+        {!readOnlySnapshot ? (
+          <button className="button primary" disabled={!status.tiingo_configured || active} onClick={() => startSync("prices")}>
+            <LineChart size={17} />同步股價
+          </button>
+        ) : (
+          <span className="status-pill unsupported">公開站不提供 Tiingo 資料</span>
+        )}
+      </section>
+
       {message ? <p className="operation-message">{message}</p> : null}
       <section className="panel runs-panel">
-        <div className="panel-title"><h2>同步紀錄</h2><span>每 5 秒更新</span></div>
+        <div className="panel-title"><h2>同步歷程</h2><span>每 5 秒更新</span></div>
         {runs.length === 0 ? <p className="muted">尚未建立同步工作。</p> : runs.map((run) => {
-          const progress = run.progress_total ? Math.min(100, run.progress_current / run.progress_total * 100) : 0;
+          const progress = run.progress_total
+            ? Math.min(100, (run.progress_current / run.progress_total) * 100)
+            : 0;
+          const success = ["completed", "completed_with_errors"].includes(run.status);
+          const failedItems = run.price_items?.filter((item) => ["failed", "unsupported"].includes(item.status)) ?? [];
           return (
             <article className="run-row" key={run.id}>
-              <span className={`run-state ${run.status}`}>{run.status === "running" ? <LoaderCircle className="spin" /> : run.status === "completed" ? <CheckCircle2 /> : <DatabaseZap />}</span>
-              <div className="run-copy"><div><strong>{run.kind === "bulk" ? "全量資料庫" : run.kind === "top100" ? "市值前 100" : `CIK ${run.cik}`}</strong><span>{statusName(run.status)}</span></div><p>{run.error ?? run.message ?? "—"}</p><div className="progress-track"><span style={{ width: `${progress}%` }} /></div></div>
+              <span className={`run-state ${run.status}`}>
+                {run.status === "running" ? <LoaderCircle className="spin" /> : success ? <CheckCircle2 /> : <DatabaseZap />}
+              </span>
+              <div className="run-copy">
+                <div><strong>{runName(run)}</strong><span>{statusName(run.status)}</span></div>
+                <p>{run.error ?? run.message ?? "—"}</p>
+                <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>
+                {failedItems.length ? <details className="sync-item-errors"><summary>{failedItems.length} 檔 ticker 需要處理</summary>{failedItems.map((item) => <div key={item.ticker}><b>{item.ticker}</b><span>{statusName(item.status)} · {item.error ?? "未知錯誤"}</span></div>)}</details> : null}
+              </div>
               <time>{run.created_at.slice(0, 16).replace("T", " ")}</time>
             </article>
           );

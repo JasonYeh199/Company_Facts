@@ -10,6 +10,7 @@ import typer
 from .db import Base, SessionLocal, engine
 from .ingestion import run_bulk_sync, run_company_sync, run_top100_sync, sync_metric_registry
 from .models import SyncRun
+from .price_sync import run_price_sync
 from .snapshot import export_vercel_snapshot
 
 app = typer.Typer(help="SEC Company Facts database utilities")
@@ -27,13 +28,13 @@ def init_db() -> None:
 
 @app.command("sync")
 def sync(
-    kind: str = typer.Option("bulk", help="bulk, top100, or company"),
+    kind: str = typer.Option("bulk", help="bulk, top100, company, prices, or price_company"),
     cik: str | None = typer.Option(None, help="CIK for company sync"),
 ) -> None:
     """Run a sync immediately in the current process."""
-    if kind not in {"bulk", "top100", "company"}:
-        raise typer.BadParameter("kind must be bulk, top100, or company")
-    if kind == "company" and not cik:
+    if kind not in {"bulk", "top100", "company", "prices", "price_company"}:
+        raise typer.BadParameter("unsupported sync kind")
+    if kind in {"company", "price_company"} and not cik:
         raise typer.BadParameter("--cik is required for company sync")
     normalized_cik = str(cik).zfill(10) if cik else None
     run_id = str(uuid.uuid4())
@@ -52,8 +53,12 @@ def sync(
         run_bulk_sync(run_id)
     elif kind == "top100":
         run_top100_sync(run_id)
-    else:
+    elif kind == "company":
         run_company_sync(run_id, normalized_cik or "")
+    elif kind == "prices":
+        run_price_sync(run_id)
+    else:
+        run_price_sync(run_id, cik=normalized_cik)
     typer.echo(f"Sync completed: {run_id}")
 
 

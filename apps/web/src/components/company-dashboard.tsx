@@ -16,6 +16,7 @@ import type { Company, MetricPoint, MetricSeries } from "@/lib/types";
 
 import { FactsExplorer } from "./facts-explorer";
 import { MetricChart } from "./metric-chart";
+import { PriceAnalysis } from "./price-analysis";
 import { SourceDrawer } from "./source-drawer";
 import { StatementTable } from "./statement-table";
 
@@ -37,7 +38,7 @@ export function CompanyDashboard({
   const [scale, setScale] = useState<Scale>("million");
   const [selectedMetric, setSelectedMetric] = useState("revenue");
   const [selectedPoint, setSelectedPoint] = useState<MetricPoint | null>(null);
-  const [view, setView] = useState<"analysis" | "facts">("analysis");
+  const [view, setView] = useState<"fundamentals" | "price" | "facts">("fundamentals");
   const [loading, setLoading] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
 
@@ -92,13 +93,16 @@ export function CompanyDashboard({
 
       <div className="subnav">
         <div className="view-tabs">
-          <button className={view === "analysis" ? "active" : ""} onClick={() => setView("analysis")}>財務分析</button>
+          <button className={view === "fundamentals" ? "active" : ""} onClick={() => setView("fundamentals")}>財務分析</button>
+          <button className={view === "price" ? "active" : ""} onClick={() => setView("price")}>股價分析</button>
           <button className={view === "facts" ? "active" : ""} onClick={() => setView("facts")}>Raw Facts</button>
         </div>
         <div className="freshness"><Database size={14} />更新於 {company.last_synced_at?.slice(0, 10) ?? "尚未同步"}</div>
       </div>
 
-      {view === "facts" ? <FactsExplorer cik={company.cik} /> : (
+      {view === "facts" ? <FactsExplorer cik={company.cik} /> : view === "price" ? (
+        <PriceAnalysis company={company} />
+      ) : (
         <>
           <div className="toolbar panel">
             <div className="segmented" aria-label="資料頻率">
@@ -162,4 +166,3 @@ export function CompanyDashboard({
     </div>
   );
 }
-

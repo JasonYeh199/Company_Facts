@@ -135,5 +135,33 @@ pnpm --filter web test:e2e
 - 首版只正規化 Company Facts 已提供的 standard/entity-wide `us-gaap` facts，不解析公司 custom extensions。
 - 金融業仍在 universe 中，但 Gross Profit、Current Assets 等不適用欄位會顯示 unavailable。
 - CapEx 正規化為正數支出，`FCF = OCF - CapEx`；EPS 不計算 TTM。
-- 不包含市場行情、估值、外匯換算、歷史下市 universe、AI 問答、帳號或正式 SaaS 營運設施。
+- 不包含即時行情、估值、外匯換算、歷史下市 universe、AI 問答、帳號或正式 SaaS 營運設施。
 - 資料僅供研究，不構成投資建議。自動化存取需遵循 [SEC Fair Access](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data)。
+
+## Tiingo Daily EOD 股價分析（內部使用）
+
+在 `.env` 設定個人或公司內部使用的 Tiingo token：
+
+```dotenv
+TIINGO_API_TOKEN=your-tiingo-token
+TIINGO_REQUESTS_PER_HOUR=45
+TIINGO_HISTORY_YEARS=10
+TIINGO_OVERLAP_DAYS=10
+```
+
+啟動服務後，可從「資料同步」頁建立 Top 100 股價工作，或直接執行：
+
+```powershell
+cd apps/api
+uv run company-facts sync --kind prices
+```
+
+Starter 方案預設每小時最多送出 45 次請求，100 檔 bootstrap 約需 2–3 小時。每日美東 20:30 增量更新，星期日執行十年歷史 reconciliation。個股頁的「股價分析」提供 raw／adjusted OHLCV、報酬、波動、回撤、SMA、RSI、MACD、布林通道、SEC filing reaction 與 Top 100 排名。
+
+Tiingo 一般方案僅允許個人或公司內部使用。本專案不會把 Tiingo 價格寫入 Vercel snapshot；公開部署只顯示授權鎖定頁。若要公開展示或再散布，須先向 Tiingo 取得相應授權。
+
+新增 API：
+
+- `GET /companies/{cik}/prices`
+- `GET /companies/{cik}/price-analysis`
+- `POST /sync-runs`，`kind` 可為 `prices` 或 `price_company`

@@ -4,6 +4,8 @@ import type {
   FactsPage,
   MetricPoint,
   MetricSeries,
+  PriceAnalysis,
+  PriceSeries,
   SetupStatus,
   Statement,
   SyncRun,
@@ -27,6 +29,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
   ) {
     super(message);
   }
@@ -40,13 +43,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     let message = `API error ${response.status}`;
+    let code: string | undefined;
     try {
-      const body = (await response.json()) as { detail?: string };
-      message = body.detail ?? message;
+      const body = (await response.json()) as {
+        detail?: string | { code?: string; message?: string };
+      };
+      if (typeof body.detail === "string") message = body.detail;
+      else if (body.detail?.message) message = body.detail.message;
+      if (typeof body.detail === "object") code = body.detail?.code;
     } catch {
       // Keep the status-based message when an upstream proxy returns non-JSON.
     }
-    throw new ApiError(response.status, message);
+    throw new ApiError(response.status, message, code);
   }
   return response.json() as Promise<T>;
 }
@@ -56,6 +64,17 @@ export const api = {
   search: (query: string) =>
     request<Company[]>(`/companies/search?q=${encodeURIComponent(query)}`),
   company: (cik: string) => request<Company>(`/companies/${cik}`),
+  prices: (cik: string, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set("start_date", startDate);
+    if (endDate) params.set("end_date", endDate);
+    const query = params.size ? `?${params}` : "";
+    return request<PriceSeries>(`/companies/${cik}/prices${query}`);
+  },
+  priceAnalysis: (cik: string, asOf?: string) =>
+    request<PriceAnalysis>(
+      `/companies/${cik}/price-analysis${asOf ? `?as_of=${asOf}` : ""}`,
+    ),
   metrics: (cik: string, frequency: string, metrics?: string[]) => {
     const params = new URLSearchParams({ frequency });
     metrics?.forEach((metric) => params.append("metric", metric));
@@ -83,7 +102,10 @@ export const api = {
     return request<CompareData>(`/compare?${params}`);
   },
   syncRuns: () => request<SyncRun[]>("/sync-runs"),
-  createSync: (kind: "bulk" | "top100" | "company", cik?: string) =>
+  createSync: (
+    kind: "bulk" | "top100" | "company" | "prices" | "price_company",
+    cik?: string,
+  ) =>
     request<SyncRun>("/sync-runs", {
       method: "POST",
       body: JSON.stringify({ kind, cik: cik || null }),

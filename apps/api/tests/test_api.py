@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
@@ -10,10 +10,23 @@ import company_facts.main as main_module
 from company_facts.db import Base, get_db
 from company_facts.ingestion import sync_metric_registry
 from company_facts.main import app
-from company_facts.models import CanonicalValue, Company, Concept, Fact, Security
+from company_facts.models import (
+    CanonicalValue,
+    Company,
+    Concept,
+    DailyPrice,
+    DailyPriceIndicator,
+    Fact,
+    PriceInstrument,
+    PriceRank,
+    PriceSyncItem,
+    Security,
+    SyncRun,
+)
+from company_facts.price_analysis import build_indicator_rows
 
 
-def make_client() -> TestClient:
+def make_client(*, with_prices: bool = False) -> TestClient:
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -76,6 +89,76 @@ def make_client() -> TestClient:
                 is_active=True,
             )
         )
+        if with_prices:
+            apple_security = (
+                session.query(Security).filter_by(company_id=apple.id, ticker="AAPL").one()
+            )
+            instrument = PriceInstrument(
+                company_id=apple.id,
+                security_id=apple_security.id,
+                provider="tiingo",
+                provider_symbol="AAPL",
+                is_primary=True,
+                status="available",
+                currency="USD",
+                coverage_start=date(2025, 1, 1),
+                coverage_end=date(2025, 10, 27),
+                last_synced_at=datetime(2025, 10, 28, tzinfo=UTC),
+            )
+            session.add(instrument)
+            session.flush()
+            prices: list[DailyPrice] = []
+            for index in range(300):
+                close = Decimal(100 + index)
+                row = DailyPrice(
+                    instrument_id=instrument.id,
+                    price_date=date(2025, 1, 1) + timedelta(days=index),
+                    open=close,
+                    high=close + 1,
+                    low=close - 1,
+                    close=close,
+                    volume=Decimal(1_000_000 + index),
+                    adj_open=close,
+                    adj_high=close + 1,
+                    adj_low=close - 1,
+                    adj_close=close,
+                    adj_volume=Decimal(1_000_000 + index),
+                    dividend_cash=Decimal("0"),
+                    split_factor=Decimal("1"),
+                )
+                session.add(row)
+                prices.append(row)
+            session.flush()
+            session.add_all(DailyPriceIndicator(**row) for row in build_indicator_rows(prices))
+            session.add(
+                PriceRank(
+                    as_of=date(2025, 10, 27),
+                    instrument_id=instrument.id,
+                    metric_code="return_1m",
+                    value=Decimal("0.12"),
+                    rank=1,
+                    percentile=Decimal("1"),
+                    universe_size=1,
+                )
+            )
+            run = SyncRun(
+                id="price-run",
+                kind="prices",
+                status="completed_with_errors",
+                progress_current=1,
+                progress_total=1,
+            )
+            session.add(run)
+            session.flush()
+            session.add(
+                PriceSyncItem(
+                    run_id=run.id,
+                    instrument_id=instrument.id,
+                    status="unsupported",
+                    row_count=0,
+                    error="provider unsupported",
+                )
+            )
         session.commit()
 
     def override_db():
@@ -125,3 +208,47 @@ def test_compare_limit_and_sync_configuration_errors(monkeypatch) -> None:
         assert response.status_code == 422
         sync = client.post("/api/v1/sync-runs", json={"kind": "bulk"})
         assert sync.status_code == 503
+
+
+def test_price_contracts_and_decimal_strings(monkeypatch) -> None:
+    monkeypatch.setattr(main_module.settings, "tiingo_api_token", "test-token-123456789")
+    with make_client(with_prices=True) as client:
+        detail = client.get("/api/v1/companies/0000320193")
+        assert detail.status_code == 200
+        assert detail.json()["price_coverage"]["ticker"] == "AAPL"
+
+        prices = client.get(
+            "/api/v1/companies/0000320193/prices",
+            params={"start_date": "2025-09-01", "end_date": "2025-10-27"},
+        )
+        assert prices.status_code == 200
+        assert prices.json()["points"][-1]["close"] == "399"
+        assert isinstance(prices.json()["points"][-1]["indicators"]["rsi_14"], str)
+
+        analysis = client.get("/api/v1/companies/0000320193/price-analysis")
+        assert analysis.status_code == 200
+        body = analysis.json()
+        assert body["latest"]["close"] == "399"
+        assert isinstance(body["returns"]["return_1m"], str)
+        assert body["rankings"][0]["rank"] == 1
+
+        runs = client.get("/api/v1/sync-runs")
+        assert runs.status_code == 200
+        assert runs.json()[0]["price_items"][0] == {
+            "ticker": "AAPL",
+            "status": "unsupported",
+            "requested_from": None,
+            "requested_to": None,
+            "row_count": 0,
+            "error": "provider unsupported",
+            "started_at": None,
+            "completed_at": None,
+        }
+
+
+def test_price_api_requires_tiingo_configuration(monkeypatch) -> None:
+    monkeypatch.setattr(main_module.settings, "tiingo_api_token", "")
+    with make_client() as client:
+        response = client.get("/api/v1/companies/0000320193/prices")
+        assert response.status_code == 503
+        assert response.json()["detail"]["code"] == "tiingo_not_configured"
