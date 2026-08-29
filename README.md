@@ -158,7 +158,17 @@ uv run company-facts sync --kind prices
 
 Starter 方案預設每小時最多送出 45 次請求，100 檔 bootstrap 約需 2–3 小時。每日美東 20:30 增量更新，星期日執行十年歷史 reconciliation。個股頁的「股價分析」提供 raw／adjusted OHLCV、報酬、波動、回撤、SMA、RSI、MACD、布林通道、SEC filing reaction 與 Top 100 排名。
 
-Tiingo 一般方案僅允許個人或公司內部使用。本專案不會把 Tiingo 價格寫入 Vercel snapshot；公開部署只顯示授權鎖定頁。若要公開展示或再散布，須先向 Tiingo 取得相應授權。
+Tiingo 一般方案僅允許個人或公司內部使用。本專案不會把 Tiingo 價格寫入公開 Vercel snapshot；公開部署只顯示授權鎖定頁。若要公開展示或再散布，須先向 Tiingo 取得相應授權。
+
+若 Vercel production 已透過 `PRIVATE_SITE_PASSWORD` 與 `PRIVATE_SITE_SESSION_SECRET` 啟用全站登入保護，可另外建立僅供本人使用的私人價格快照：
+
+```powershell
+$env:DATABASE_URL = "postgresql+psycopg://company_facts:company_facts@localhost:55432/company_facts"
+cd apps/api
+uv run company-facts export-private-price-snapshot --output ../../apps/web/public/snapshot
+```
+
+Vercel 必須另設定 `PRIVATE_PRICE_SNAPSHOT=enabled` 才會提供價格 API。`apps/web/public/snapshot/private-prices/` 已由 Git 排除，禁止提交到 GitHub；更新後只使用受登入保護的 CLI production deployment。未登入頁面會導向 `/login`，API 回傳 `401 private_auth_required`。
 
 新增 API：
 

@@ -80,7 +80,8 @@ export function SyncPanel({ initial }: { initial: SetupStatus | null }) {
     );
   }
 
-  const readOnlySnapshot = status.data_dir === "vercel://read-only-snapshot";
+  const readOnlySnapshot = status.data_dir.startsWith("vercel://");
+  const privateSnapshot = status.data_dir === "vercel://private-snapshot";
   const active = runs.some((run) => ["pending", "running"].includes(run.status));
   return (
     <div className="setup-page">
@@ -103,8 +104,8 @@ export function SyncPanel({ initial }: { initial: SetupStatus | null }) {
           {readOnlySnapshot || status.tiingo_configured ? <CheckCircle2 /> : <AlertTriangle />}
           <div>
             <small>TIINGO TOKEN</small>
-            <strong>{readOnlySnapshot ? "內部限定" : status.tiingo_configured ? "已設定" : "尚未設定"}</strong>
-            <span>{readOnlySnapshot ? "不輸出價格資料" : `${status.price_company_count} 家已有價格`}</span>
+            <strong>{privateSnapshot ? "私人快照" : readOnlySnapshot ? "內部限定" : status.tiingo_configured ? "已設定" : "尚未設定"}</strong>
+            <span>{privateSnapshot ? `${status.price_company_count} 家已有價格` : readOnlySnapshot ? "不輸出價格資料" : `${status.price_company_count} 家已有價格`}</span>
           </div>
         </article>
         <article className={status.free_gib >= status.disk_requirement_gib ? "ready" : "warning"}>
@@ -154,7 +155,7 @@ export function SyncPanel({ initial }: { initial: SetupStatus | null }) {
             <LineChart size={17} />同步股價
           </button>
         ) : (
-          <span className="status-pill unsupported">公開站不提供 Tiingo 資料</span>
+          <span className="status-pill unsupported">{privateSnapshot ? "請由本機更新私人快照" : "公開站不提供 Tiingo 資料"}</span>
         )}
       </section>
 

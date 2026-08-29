@@ -129,6 +129,8 @@ def export_vercel_snapshot(
     session: Session,
     output_dir: Path,
     facts_per_company: int = FACTS_PER_COMPANY,
+    *,
+    include_private_prices: bool = False,
 ) -> dict[str, int]:
     generated_at = datetime.now(UTC)
     companies = list(
@@ -308,6 +310,11 @@ def export_vercel_snapshot(
         "definitions": definition_payloads,
         "sync_runs": [sync_payload],
     }
+    price_result: dict[str, Any] | None = None
+    if include_private_prices:
+        from .private_price_snapshot import export_private_price_snapshots
+
+        price_result = export_private_price_snapshots(session, output_dir)
     total_bytes = _write_json(output_dir / "index.json", index_payload)
     for company in companies:
         company_metrics = {
@@ -326,5 +333,7 @@ def export_vercel_snapshot(
         "companies": len(companies),
         "points": point_count,
         "facts": fact_count,
-        "bytes": total_bytes,
+        "price_companies": int(price_result["company_count"]) if price_result else 0,
+        "price_points": int(price_result["point_count"]) if price_result else 0,
+        "bytes": total_bytes + (int(price_result["bytes"]) if price_result else 0),
     }

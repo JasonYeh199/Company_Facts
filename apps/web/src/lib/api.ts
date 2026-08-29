@@ -36,10 +36,16 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const internalAuth =
+    typeof window === "undefined" ? process.env.PRIVATE_SITE_SESSION_SECRET : undefined;
   const response = await fetch(`${baseUrl()}${path}`, {
     ...init,
     cache: "no-store",
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(internalAuth ? { "x-private-internal-auth": internalAuth } : {}),
+      ...init?.headers,
+    },
   });
   if (!response.ok) {
     let message = `API error ${response.status}`;

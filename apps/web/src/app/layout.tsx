@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   const isReadOnlySnapshot = Boolean(process.env.VERCEL);
+  const isPrivateSnapshot = process.env.PRIVATE_PRICE_SNAPSHOT === "enabled";
   return (
     <html lang="zh-Hant" className={`${inter.variable} ${noto.variable}`}>
       <body>
@@ -23,7 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <main>{children}</main>
         <footer className="site-footer">
           <span>資料來源 SEC EDGAR</span>
-          {isReadOnlySnapshot ? <span>Vercel 唯讀快照 · Annual 2019+ · Quarterly/TTM 2023+</span> : null}
+          {isReadOnlySnapshot ? <span>{isPrivateSnapshot ? "Vercel 私人快照 · Tiingo Daily EOD" : "Vercel 唯讀快照"} · Annual 2019+ · Quarterly/TTM 2023+</span> : null}
           <span>僅供研究，不構成投資建議</span>
         </footer>
       </body>

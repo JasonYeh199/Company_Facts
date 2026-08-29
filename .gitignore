@@ -14,3 +14,6 @@ playwright-report/
 test-results/
 **/data/
 
+
+.vercel
+apps/web/public/snapshot/private-prices/

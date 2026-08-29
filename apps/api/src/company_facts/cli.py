@@ -11,6 +11,7 @@ from .db import Base, SessionLocal, engine
 from .ingestion import run_bulk_sync, run_company_sync, run_top100_sync, sync_metric_registry
 from .models import SyncRun
 from .price_sync import run_price_sync
+from .private_price_snapshot import export_private_price_snapshots
 from .snapshot import export_vercel_snapshot
 
 app = typer.Typer(help="SEC Company Facts database utilities")
@@ -69,10 +70,32 @@ def export_snapshot(
         typer.Option(help="Output directory for Vercel snapshot JSON"),
     ],
     facts_per_company: Annotated[int, typer.Option(min=0, max=1_000)] = 250,
+    include_private_prices: Annotated[
+        bool,
+        typer.Option(help="Include Tiingo prices only for an access-protected deployment"),
+    ] = False,
 ) -> None:
     """Export a compact, read-only Top 100 snapshot for the Next.js deployment."""
     with SessionLocal() as session:
-        result = export_vercel_snapshot(session, output, facts_per_company)
+        result = export_vercel_snapshot(
+            session,
+            output,
+            facts_per_company,
+            include_private_prices=include_private_prices,
+        )
+    typer.echo(json.dumps(result, ensure_ascii=False))
+
+
+@app.command("export-private-price-snapshot")
+def export_private_price_snapshot(
+    output: Annotated[
+        Path,
+        typer.Option(help="Existing Vercel snapshot directory"),
+    ],
+) -> None:
+    """Export Tiingo data separately for an access-protected deployment."""
+    with SessionLocal() as session:
+        result = export_private_price_snapshots(session, output)
     typer.echo(json.dumps(result, ensure_ascii=False))
 
 

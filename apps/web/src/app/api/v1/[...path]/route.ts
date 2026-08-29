@@ -5,6 +5,9 @@ import type {
   Company,
   Fact,
   MetricPoint,
+  PriceAnalysis,
+  PriceCoverage,
+  PriceSeries,
   SyncRun,
 } from "@/lib/types";
 
@@ -28,10 +31,25 @@ type SnapshotIndex = {
   sync_runs: SyncRun[];
 };
 
+type PrivatePriceIndex = {
+  included: boolean;
+  generated_at: string;
+  company_count: number;
+  point_count: number;
+  latest_date: string | null;
+  latest_sync: SyncRun | null;
+};
+
 type CompanySnapshot = {
   company: Company;
   metrics: Record<string, Record<string, MetricPoint[]>>;
   facts: Fact[];
+};
+
+type PrivatePriceSnapshot = {
+  coverage: PriceCoverage;
+  series: PriceSeries;
+  analysis: PriceAnalysis;
 };
 
 type RouteContext = { params: Promise<{ path: string[] }> };
@@ -65,11 +83,33 @@ function normalizeCik(value: string): string | null {
 
 async function snapshotJson<T>(request: NextRequest, path: string): Promise<T> {
   const target = new URL(`/snapshot/${path}.gz`, request.url);
-  const response = await fetch(target, { next: { revalidate: 3600 } });
+  const cookie = request.headers.get("cookie");
+  const internalAuth = request.headers.get("x-private-internal-auth");
+  const response = await fetch(target, {
+    headers: {
+      ...(cookie ? { cookie } : {}),
+      ...(internalAuth ? { "x-private-internal-auth": internalAuth } : {}),
+    },
+    next: { revalidate: 3600 },
+  });
   if (!response.ok) throw new Error(`Snapshot asset ${path} returned ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
   const decoded = bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes) : bytes;
   return JSON.parse(decoded.toString("utf-8")) as T;
+}
+
+async function privatePriceSnapshot(request: NextRequest, cik: string) {
+  try {
+    return await snapshotJson<PrivatePriceSnapshot>(request, `private-prices/${cik}.json`);
+  } catch {
+    return null;
+  }
+}
+
+function oneYearBefore(value: string): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCFullYear(date.getUTCFullYear() - 1);
+  return date.toISOString().slice(0, 10);
 }
 
 async function companySnapshot(request: NextRequest, value: string) {
@@ -115,27 +155,40 @@ export async function GET(request: NextRequest, context: RouteContext) {
   } catch {
     return error("Vercel snapshot 尚未建立", 503);
   }
+  let privatePriceIndex: PrivatePriceIndex | null = null;
+  if (process.env.PRIVATE_PRICE_SNAPSHOT === "enabled") {
+    try {
+      privatePriceIndex = await snapshotJson<PrivatePriceIndex>(
+        request,
+        "private-prices/index.json",
+      );
+    } catch {
+      privatePriceIndex = null;
+    }
+  }
 
   if (path.length === 1 && path[0] === "setup") {
     const latestSync = index.sync_runs[0] ?? null;
+    const privatePrices = privatePriceIndex?.included ? privatePriceIndex : undefined;
     return NextResponse.json({
       sec_configured: true,
       database_connected: true,
-      data_dir: "vercel://read-only-snapshot",
+      data_dir: privatePrices ? "vercel://private-snapshot" : "vercel://read-only-snapshot",
       free_gib: 0,
       disk_requirement_gib: 0,
       company_count: index.companies.length,
       supported_company_count: index.companies.filter((item) => item.supported).length,
       latest_sync: latestSync,
-      tiingo_configured: false,
-      price_company_count: 0,
-      latest_price_date: null,
-      latest_price_sync: null,
+      tiingo_configured: Boolean(privatePrices),
+      price_company_count: privatePrices?.company_count ?? 0,
+      latest_price_date: privatePrices?.latest_date ?? null,
+      latest_price_sync: privatePrices?.latest_sync ?? null,
     });
   }
 
   if (path.length === 1 && path[0] === "sync-runs") {
-    return NextResponse.json(index.sync_runs);
+    const priceSync = privatePriceIndex?.included ? privatePriceIndex.latest_sync : null;
+    return NextResponse.json(priceSync ? [priceSync, ...index.sync_runs] : index.sync_runs);
   }
 
   if (path.length === 2 && path[0] === "companies" && path[1] === "search") {
@@ -166,9 +219,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   if (path.length === 2 && path[0] === "companies") {
     const snapshot = await companySnapshot(request, path[1]);
-    return snapshot
-      ? NextResponse.json(lockedCompany(snapshot.company))
-      : error("找不到公司", 404);
+    if (!snapshot) return error("找不到公司", 404);
+    if (!privatePriceIndex?.included) {
+      return NextResponse.json(lockedCompany(snapshot.company));
+    }
+    const cik = normalizeCik(path[1]);
+    const prices = cik ? await privatePriceSnapshot(request, cik) : null;
+    return NextResponse.json({
+      ...snapshot.company,
+      price_coverage: prices?.coverage ?? {
+        ticker: snapshot.company.tickers[0]?.ticker ?? null,
+        status: "pending",
+        start_date: null,
+        end_date: null,
+        last_synced_at: null,
+        reason: "私人價格快照尚未涵蓋此公司",
+      },
+    });
   }
 
   if (
@@ -176,13 +243,52 @@ export async function GET(request: NextRequest, context: RouteContext) {
     path[0] === "companies" &&
     (path[2] === "prices" || path[2] === "price-analysis")
   ) {
-    return error(
-      {
-        code: "tiingo_internal_only",
-        message: "Tiingo 股價資料僅限內部／本機環境使用",
-      },
-      403,
-    );
+    if (!privatePriceIndex?.included) {
+      return error(
+        {
+          code: "tiingo_internal_only",
+          message: "Tiingo 股價資料僅限內部／本機環境使用",
+        },
+        403,
+      );
+    }
+    const cik = normalizeCik(path[1]);
+    const priceSnapshot = cik ? await privatePriceSnapshot(request, cik) : null;
+    if (!priceSnapshot) {
+      return error(
+        { code: "price_data_unavailable", message: "私人快照尚未涵蓋此公司" },
+        503,
+      );
+    }
+    if (path[2] === "price-analysis") {
+      const requestedAsOf = request.nextUrl.searchParams.get("as_of");
+      if (requestedAsOf && requestedAsOf !== priceSnapshot.analysis.as_of) {
+        return error("私人快照只提供最新分析基準日", 422);
+      }
+      return NextResponse.json(priceSnapshot.analysis);
+    }
+    const requestedStart = request.nextUrl.searchParams.get("start_date");
+    const requestedEnd = request.nextUrl.searchParams.get("end_date");
+    const endDate = requestedEnd ?? priceSnapshot.series.end_date;
+    const startDate = requestedStart ?? oneYearBefore(endDate);
+    if (startDate > endDate) return error("start_date 不得晚於 end_date", 422);
+    if (
+      startDate < priceSnapshot.series.start_date ||
+      endDate > priceSnapshot.series.end_date
+    ) {
+      return error("查詢期間超出私人快照涵蓋範圍", 422);
+    }
+    return NextResponse.json({
+      ...priceSnapshot.series,
+      start_date: startDate,
+      end_date: endDate,
+      points: priceSnapshot.series.points.filter(
+        (point) => point.date >= startDate && point.date <= endDate,
+      ),
+      events: priceSnapshot.series.events.filter(
+        (event) => event.date >= startDate && event.date <= endDate,
+      ),
+    });
   }
 
   if (path.length === 3 && path[0] === "companies" && path[2] === "metrics") {
