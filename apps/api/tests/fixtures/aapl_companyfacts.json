@@ -1,0 +1,58 @@
+{
+  "cik": 320193,
+  "entityName": "Apple Inc.",
+  "facts": {
+    "dei": {},
+    "us-gaap": {
+      "RevenueFromContractWithCustomerExcludingAssessedTax": {
+        "label": "Revenue",
+        "description": "Revenue from contracts with customers.",
+        "units": {
+          "USD": [
+            {"start": "2023-10-01", "end": "2024-09-28", "val": 391035000000, "accn": "0000320193-24-000123", "fy": 2024, "fp": "FY", "form": "10-K", "filed": "2024-11-01"},
+            {"start": "2023-10-01", "end": "2023-12-30", "val": 119575000000, "accn": "0000320193-24-000006", "fy": 2024, "fp": "Q1", "form": "10-Q", "filed": "2024-02-02"},
+            {"start": "2023-12-31", "end": "2024-03-30", "val": 90753000000, "accn": "0000320193-24-000069", "fy": 2024, "fp": "Q2", "form": "10-Q", "filed": "2024-05-03"},
+            {"start": "2024-03-31", "end": "2024-06-29", "val": 85777000000, "accn": "0000320193-24-000081", "fy": 2024, "fp": "Q3", "form": "10-Q", "filed": "2024-08-02"}
+          ]
+        }
+      },
+      "NetIncomeLoss": {
+        "label": "Net Income",
+        "description": "Net income or loss.",
+        "units": {
+          "USD": [
+            {"start": "2023-10-01", "end": "2024-09-28", "val": 93736000000, "accn": "0000320193-24-000123", "fy": 2024, "fp": "FY", "form": "10-K", "filed": "2024-11-01"}
+          ]
+        }
+      },
+      "Assets": {
+        "label": "Assets",
+        "description": "Total assets.",
+        "units": {
+          "USD": [
+            {"end": "2024-09-28", "val": 364980000000, "accn": "0000320193-24-000123", "fy": 2024, "fp": "FY", "form": "10-K", "filed": "2024-11-01"}
+          ]
+        }
+      },
+      "NetCashProvidedByUsedInOperatingActivities": {
+        "label": "Operating Cash Flow",
+        "description": "Operating cash flow.",
+        "units": {
+          "USD": [
+            {"start": "2023-10-01", "end": "2024-09-28", "val": 118254000000, "accn": "0000320193-24-000123", "fy": 2024, "fp": "FY", "form": "10-K", "filed": "2024-11-01"}
+          ]
+        }
+      },
+      "PaymentsToAcquirePropertyPlantAndEquipment": {
+        "label": "Capital Expenditures",
+        "description": "Payments for property, plant and equipment.",
+        "units": {
+          "USD": [
+            {"start": "2023-10-01", "end": "2024-09-28", "val": 9447000000, "accn": "0000320193-24-000123", "fy": 2024, "fp": "FY", "form": "10-K", "filed": "2024-11-01"}
+          ]
+        }
+      }
+    }
+  }
+}
+

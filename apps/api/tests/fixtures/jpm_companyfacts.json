@@ -1,0 +1,24 @@
+{
+  "cik": 19617,
+  "entityName": "JPMorgan Chase & Co",
+  "facts": {
+    "us-gaap": {
+      "Revenues": {
+        "label": "Revenues",
+        "description": "Bank revenues.",
+        "units": {"USD": [{"start": "2023-01-01", "end": "2023-12-31", "val": 158104000000, "accn": "0000019617-24-000010", "fy": 2023, "fp": "FY", "form": "10-K", "filed": "2024-02-16"}]}
+      },
+      "NetIncomeLoss": {
+        "label": "Net Income",
+        "description": "Net income.",
+        "units": {"USD": [{"start": "2023-01-01", "end": "2023-12-31", "val": 49552000000, "accn": "0000019617-24-000010", "fy": 2023, "fp": "FY", "form": "10-K", "filed": "2024-02-16"}]}
+      },
+      "Assets": {
+        "label": "Assets",
+        "description": "Total assets.",
+        "units": {"USD": [{"end": "2023-12-31", "val": 3875000000000, "accn": "0000019617-24-000010", "fy": 2023, "fp": "FY", "form": "10-K", "filed": "2024-02-16"}]}
+      }
+    }
+  }
+}
+

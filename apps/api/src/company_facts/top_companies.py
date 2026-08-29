@@ -1,0 +1,17 @@
+"""Daily market-cap snapshot used for the focused bootstrap option."""
+
+TOP100_AS_OF = "2026-08-29"
+TOP100_SOURCE = (
+    "https://companiesmarketcap.com/usa/largest-companies-in-the-usa-by-market-cap/?page=1"
+)
+TOP100_TICKERS = frozenset(
+    """
+    NVDA AAPL GOOG MSFT AMZN SPCX AVGO META TSLA BRK-B MU LLY JPM WMT AMD V JNJ XOM MA INTC
+    ABBV PLTR BAC ORCL CSCO COST CVX KO LRCX CAT AMAT MRK GE UNH NFLX MS PG HD PANW GS PM DELL
+    RTX WFC ANET GEV TXN AMGN TMO KLAC AXP CRWD C IBM SNDK CRM VZ MRVL ABT TMUS APH PEP SCHW
+    BLK MCD DIS UNP GILD T SCCO QCOM ADI WELL NEE BX DE BA WDC IBKR UBER PFE COP BKNG DHR NOW
+    TJX VRTX PLD BMY NEM ISRG COF SPGI LMT GLW PGR SYK PH SBUX FTNT
+    """.split()
+)
+
+assert len(TOP100_TICKERS) == 100

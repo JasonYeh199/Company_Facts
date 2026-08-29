@@ -1,0 +1,16 @@
+.env
+.next/
+node_modules/
+.pnpm-store/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.py[cod]
+*.sqlite3
+coverage/
+htmlcov/
+playwright-report/
+test-results/
+**/data/
+

@@ -1,0 +1,74 @@
+name: company-facts
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: company_facts
+      POSTGRES_USER: company_facts
+      POSTGRES_PASSWORD: company_facts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U company_facts -d company_facts"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+
+  migrate:
+    build:
+      context: ./apps/api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://company_facts:company_facts@db:5432/company_facts
+    command: ["uv", "run", "alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./apps/api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://company_facts:company_facts@db:5432/company_facts
+    command: ["uv", "run", "uvicorn", "company_facts.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    volumes:
+      - sec-data:/data/sec
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: ./apps/api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://company_facts:company_facts@db:5432/company_facts
+    command: ["uv", "run", "company-facts-worker"]
+    volumes:
+      - sec-data:/data/sec
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
+      API_INTERNAL_BASE_URL: http://api:8000/api/v1
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  sec-data:
