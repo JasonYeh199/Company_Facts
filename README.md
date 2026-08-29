@@ -43,6 +43,17 @@ docker compose up --build
 
 官方 archives 目前約 2.8 GiB 壓縮後、23 GiB 解壓後；系統直接從 ZIP 串流讀取，不會先展開全部 JSON，且 Top 100 與全市場模式會重用相同下載檔。完成第一次 bootstrap 後，worker 每日美東 04:00 檢查 ETag／Last-Modified，並沿用最近一次完成的同步範圍。
 
+## Vercel 前端部署
+
+Vercel 專案的 Root Directory 設為 `apps/web`。前端可獨立部署，但完整查詢仍需要可公開連線的 FastAPI；請在 Vercel 同時設定：
+
+```dotenv
+NEXT_PUBLIC_API_BASE_URL=https://your-api.example.com/api/v1
+API_INTERNAL_BASE_URL=https://your-api.example.com/api/v1
+```
+
+若未設定，公開版會顯示 API 未連線狀態。PostgreSQL、SEC bulk worker、ZIP 持久化 volume 與每日同步仍應部署在支援長時間背景工作的主機，不放入 Vercel Functions。
+
 ## 本機開發
 
 後端：
