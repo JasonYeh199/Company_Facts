@@ -11,9 +11,11 @@ import type {
 
 function baseUrl(): string {
   if (typeof window === "undefined") {
+    const vercelHost = process.env.VERCEL_URL;
     return (
       process.env.API_INTERNAL_BASE_URL ??
       process.env.NEXT_PUBLIC_API_BASE_URL ??
+      (vercelHost ? `https://${vercelHost}/api/v1` : undefined) ??
       "http://localhost:8000/api/v1"
     );
   }

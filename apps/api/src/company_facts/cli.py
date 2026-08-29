@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import json
 import uuid
+from pathlib import Path
+from typing import Annotated
 
 import typer
 
 from .db import Base, SessionLocal, engine
 from .ingestion import run_bulk_sync, run_company_sync, run_top100_sync, sync_metric_registry
 from .models import SyncRun
+from .snapshot import export_vercel_snapshot
 
 app = typer.Typer(help="SEC Company Facts database utilities")
 
@@ -51,6 +55,20 @@ def sync(
     else:
         run_company_sync(run_id, normalized_cik or "")
     typer.echo(f"Sync completed: {run_id}")
+
+
+@app.command("export-vercel-snapshot")
+def export_snapshot(
+    output: Annotated[
+        Path,
+        typer.Option(help="Output directory for Vercel snapshot JSON"),
+    ],
+    facts_per_company: Annotated[int, typer.Option(min=0, max=1_000)] = 250,
+) -> None:
+    """Export a compact, read-only Top 100 snapshot for the Next.js deployment."""
+    with SessionLocal() as session:
+        result = export_vercel_snapshot(session, output, facts_per_company)
+    typer.echo(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":

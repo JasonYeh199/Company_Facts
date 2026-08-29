@@ -43,26 +43,29 @@ export function SyncPanel({ initial }: { initial: SetupStatus | null }) {
   if (!status) {
     return <div className="empty-page"><AlertTriangle /><h1>API 尚未連線</h1><p>請確認 FastAPI 與 PostgreSQL 已啟動。</p></div>;
   }
+  const readOnlySnapshot = status.data_dir === "vercel://read-only-snapshot";
   return (
     <div className="setup-page">
       <header className="page-intro"><span className="section-kicker">DATA OPERATIONS</span><h1>資料環境與同步</h1><p>第一次匯入會下載 SEC bulk archives，並逐家公司建立 raw facts 與 canonical metrics。</p></header>
       <section className="readiness-grid">
         <article className={status.sec_configured ? "ready" : "warning"}>
-          {status.sec_configured ? <CheckCircle2 /> : <AlertTriangle />}<div><small>SEC USER-AGENT</small><strong>{status.sec_configured ? "已設定" : "需要設定"}</strong><span>{status.sec_configured ? "符合自動化存取要求" : "請編輯根目錄 .env"}</span></div>
+          {status.sec_configured ? <CheckCircle2 /> : <AlertTriangle />}<div><small>{readOnlySnapshot ? "DEPLOYMENT MODE" : "SEC USER-AGENT"}</small><strong>{readOnlySnapshot ? "唯讀快照" : status.sec_configured ? "已設定" : "需要設定"}</strong><span>{readOnlySnapshot ? "線上版不執行寫入或同步" : status.sec_configured ? "符合自動化存取要求" : "請編輯根目錄 .env"}</span></div>
         </article>
         <article className={status.free_gib >= status.disk_requirement_gib ? "ready" : "warning"}>
-          <HardDrive /><div><small>可用磁碟</small><strong>{status.free_gib} GiB</strong><span>最低需求 {status.disk_requirement_gib} GiB</span></div>
+          <HardDrive /><div><small>{readOnlySnapshot ? "資料涵蓋" : "可用磁碟"}</small><strong>{readOnlySnapshot ? "近年資料" : `${status.free_gib} GiB`}</strong><span>{readOnlySnapshot ? "Annual 2019+ · Quarterly/TTM 2023+" : `最低需求 ${status.disk_requirement_gib} GiB`}</span></div>
         </article>
         <article className="ready">
           <DatabaseZap /><div><small>資料庫</small><strong>{status.supported_company_count.toLocaleString("zh-TW")} 家</strong><span>{status.company_count.toLocaleString("zh-TW")} 家證券主檔</span></div>
         </article>
       </section>
       <section className="panel bootstrap-panel">
-        <div><span className="section-kicker">FOCUSED BOOTSTRAP</span><h2>SEC Bulk Bootstrap</h2><p>建議先同步市值前 100；系統會重用 SEC ZIP，成功後每日美東 04:00 自動檢查更新。</p></div>
-        <div className="sync-actions">
-          <button className="button primary" disabled={!status.sec_configured || status.free_gib < 60 || runs.some((run) => ["pending", "running"].includes(run.status))} onClick={() => bootstrap("top100")}><RefreshCw size={17} />同步市值前 100</button>
-          <button className="button secondary" disabled={!status.sec_configured || status.free_gib < 60 || runs.some((run) => ["pending", "running"].includes(run.status))} onClick={() => bootstrap("bulk")}><DatabaseZap size={17} />同步全市場</button>
-        </div>
+        <div><span className="section-kicker">{readOnlySnapshot ? "VERCEL SNAPSHOT" : "FOCUSED BOOTSTRAP"}</span><h2>{readOnlySnapshot ? "線上唯讀資料" : "SEC Bulk Bootstrap"}</h2><p>{readOnlySnapshot ? "搜尋、個股分析、比較與來源追溯可直接使用；資料更新請回到本機 worker 執行後重新匯出。" : "建議先同步市值前 100；系統會重用 SEC ZIP，成功後每日美東 04:00 自動檢查更新。"}</p></div>
+        {!readOnlySnapshot ? (
+          <div className="sync-actions">
+            <button className="button primary" disabled={!status.sec_configured || status.free_gib < 60 || runs.some((run) => ["pending", "running"].includes(run.status))} onClick={() => bootstrap("top100")}><RefreshCw size={17} />同步市值前 100</button>
+            <button className="button secondary" disabled={!status.sec_configured || status.free_gib < 60 || runs.some((run) => ["pending", "running"].includes(run.status))} onClick={() => bootstrap("bulk")}><DatabaseZap size={17} />同步全市場</button>
+          </div>
+        ) : null}
       </section>
       {message ? <p className="operation-message">{message}</p> : null}
       <section className="panel runs-panel">

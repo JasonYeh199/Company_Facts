@@ -45,14 +45,18 @@ docker compose up --build
 
 ## Vercel 前端部署
 
-Vercel 專案的 Root Directory 設為 `apps/web`。前端可獨立部署，但完整查詢仍需要可公開連線的 FastAPI；請在 Vercel 同時設定：
+Vercel 專案的 Root Directory 設為 `apps/web`。預設部署內含同源唯讀 snapshot API，可使用 Top 100 搜尋、個股分析、公司比較、來源 lineage，以及每家公司最新 250 筆 raw facts。快照涵蓋年度資料 2019 年起、季度與 TTM 資料 2023 年起。
 
-```dotenv
-NEXT_PUBLIC_API_BASE_URL=https://your-api.example.com/api/v1
-API_INTERNAL_BASE_URL=https://your-api.example.com/api/v1
+本機同步完成後，可重新產生壓縮快照：
+
+```powershell
+cd apps/api
+$snapshotDbPort = 5432 # 若 .env 有調整 POSTGRES_PORT，請使用相同連接埠
+$env:DATABASE_URL = "postgresql+psycopg://company_facts:company_facts@localhost:$snapshotDbPort/company_facts"
+uv run company-facts export-vercel-snapshot --output ../../apps/web/public/snapshot
 ```
 
-若未設定，公開版會顯示 API 未連線狀態。PostgreSQL、SEC bulk worker、ZIP 持久化 volume 與每日同步仍應部署在支援長時間背景工作的主機，不放入 Vercel Functions。
+若另有可公開連線的 FastAPI，可設定 `NEXT_PUBLIC_API_BASE_URL` 與 `API_INTERNAL_BASE_URL` 覆蓋 snapshot API。PostgreSQL、SEC bulk worker、ZIP 持久化 volume 與每日同步仍應部署在支援長時間背景工作的主機，不放入 Vercel Functions。
 
 ## 本機開發
 
